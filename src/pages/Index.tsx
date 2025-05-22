@@ -6,39 +6,72 @@ import PatientTable from "@/components/PatientTable";
 import QueryPanel from "@/components/QueryPanel";
 import { Patient, PatientFormData } from "@/types";
 import { v4 as uuidv4 } from "uuid";
+import { initializeDb, savePatient, getAllPatients } from "@/lib/db";
+import { toast } from "sonner";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<string>("register");
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Load patients from localStorage on initial render
+  // Initialize database and load patients
   useEffect(() => {
-    const savedPatients = localStorage.getItem("patients");
-    if (savedPatients) {
+    const loadData = async () => {
       try {
-        setPatients(JSON.parse(savedPatients));
+        setIsLoading(true);
+        await initializeDb();
+        const loadedPatients = await getAllPatients();
+        setPatients(loadedPatients);
       } catch (error) {
-        console.error("Failed to parse patients from localStorage:", error);
+        console.error("Failed to load patients:", error);
+        toast.error("Failed to load patients");
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    loadData();
   }, []);
 
-  // Save patients to localStorage whenever the list changes
+  // Listen for storage events to sync across tabs
   useEffect(() => {
-    localStorage.setItem("patients", JSON.stringify(patients));
-  }, [patients]);
-
-  const handleRegisterPatient = (formData: PatientFormData) => {
-    const newPatient: Patient = {
-      ...formData,
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
+    const handleStorageChange = async (event: StorageEvent) => {
+      if (event.key === 'db_updated') {
+        try {
+          const loadedPatients = await getAllPatients();
+          setPatients(loadedPatients);
+        } catch (error) {
+          console.error("Failed to reload patients:", error);
+        }
+      }
     };
+
+    window.addEventListener('storage', handleStorageChange);
     
-    setPatients((prevPatients) => [...prevPatients, newPatient]);
-    
-    // Automatically switch to the patients tab after registration
-    setActiveTab("patients");
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  const handleRegisterPatient = async (formData: PatientFormData) => {
+    try {
+      const newPatient: Patient = {
+        ...formData,
+        id: uuidv4(),
+        createdAt: new Date().toISOString(),
+      };
+      
+      await savePatient(newPatient);
+      
+      // Update the local state
+      setPatients((prevPatients) => [newPatient, ...prevPatients]);
+      
+      // Automatically switch to the patients tab after registration
+      setActiveTab("patients");
+    } catch (error) {
+      console.error("Failed to register patient:", error);
+      toast.error("Failed to register patient");
+    }
   };
 
   return (
@@ -51,7 +84,7 @@ const Index = () => {
         )}
         
         {activeTab === "patients" && (
-          <PatientTable patients={patients} />
+          <PatientTable patients={patients} isLoading={isLoading} />
         )}
         
         {activeTab === "query" && (

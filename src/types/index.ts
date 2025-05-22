@@ -17,3 +17,8 @@ export interface Patient {
 }
 
 export type PatientFormData = Omit<Patient, "id" | "createdAt">;
+
+// Database specific types
+export interface DbQueryResult {
+  [key: string]: any;
+}

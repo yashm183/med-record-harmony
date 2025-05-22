@@ -16,9 +16,10 @@ import { Search, X } from "lucide-react";
 
 interface PatientTableProps {
   patients: Patient[];
+  isLoading?: boolean;
 }
 
-const PatientTable = ({ patients }: PatientTableProps) => {
+const PatientTable = ({ patients, isLoading = false }: PatientTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   
   const filteredPatients = patients.filter((patient) => {
@@ -61,7 +62,11 @@ const PatientTable = ({ patients }: PatientTableProps) => {
       <CardContent>
         <div className="rounded-md border">
           <div className="overflow-x-auto">
-            {filteredPatients.length > 0 ? (
+            {isLoading ? (
+              <div className="flex justify-center items-center h-20 text-gray-500">
+                Loading patients...
+              </div>
+            ) : filteredPatients.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
