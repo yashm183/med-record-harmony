@@ -1,15 +1,20 @@
 
-import { tblrx, initDb } from '@vlcn.io/crsqlite-wasm';
+import { PGlite } from '@electric-sql/pglite';
 import { Patient } from '@/types';
 
-// Database initialization
-let dbPromise: Promise<any> | null = null;
+// Initialize PGlite with IndexedDB storage
+let dbPromise: Promise<PGlite> | null = null;
 
-export const initializeDb = async () => {
+export const initializeDb = async (): Promise<PGlite> => {
   if (!dbPromise) {
-    dbPromise = initDb('patient_registry.db');
+    // Create a new PGlite instance using IndexedDB storage
+    dbPromise = new PGlite({
+      name: 'patient_registry',
+      storage: 'indexeddb'
+    }).connect();
+    
     const db = await dbPromise;
-
+    
     // Create patients table if it doesn't exist
     await db.exec(`
       CREATE TABLE IF NOT EXISTS patients (
@@ -35,7 +40,7 @@ export const initializeDb = async () => {
 };
 
 // Get database instance
-export const getDb = async () => {
+export const getDb = async (): Promise<PGlite> => {
   return await initializeDb();
 };
 
@@ -48,7 +53,7 @@ export const savePatient = async (patient: Patient): Promise<void> => {
       medicalHistory, insuranceProvider, insuranceNumber, 
       emergencyContact, emergencyPhone, createdAt
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
     )
   `, [
     patient.id, patient.firstName, patient.lastName, patient.dateOfBirth,
@@ -64,8 +69,8 @@ export const savePatient = async (patient: Patient): Promise<void> => {
 // Get all patients from database
 export const getAllPatients = async (): Promise<Patient[]> => {
   const db = await getDb();
-  const result = await db.execO(`SELECT * FROM patients ORDER BY createdAt DESC`);
-  return result as Patient[];
+  const result = await db.exec<Patient>(`SELECT * FROM patients ORDER BY createdAt DESC`);
+  return result.rows;
 };
 
 // Execute custom SQL queries
@@ -76,8 +81,8 @@ export const executeQuery = async (query: string): Promise<any[]> => {
   
   try {
     const db = await getDb();
-    const result = await db.execO(query);
-    return result;
+    const result = await db.exec(query);
+    return result.rows;
   } catch (error) {
     console.error('SQL Error:', error);
     throw error;
